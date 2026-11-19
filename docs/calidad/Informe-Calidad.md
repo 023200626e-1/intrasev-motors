@@ -72,7 +72,7 @@ Indicadores manuales repetibles, sin PHPStan ni PHPMD, por indicación del docen
 | Commit (hash) | Persona | Archivo o cambio | Justificación y prueba asociada |
 | :--- | :--- | :--- | :--- |
 | `0444810` | Persona 1 (Jean Pol Sullca Caballero) | `docs/calidad/evidencias/.gitkeep`, `docs/calidad/evidencias/phpunit-antes.txt`, `docs/calidad/Informe-Calidad.md` | Creación de línea base en rama `refactor/carrito`, estructura del informe, formato F22 y evidencia inicial de PHPUnit (6 tests, 6 assertions OK). |
-| `(registrar con git log -1 --format=%h)` | Persona 2 (Jhon Richard Daniel Guillen Hurtado) | `docs/calidad/Informe-Calidad.md`, `F23-inventario.md`, `F26-medicion.md`, `evidencias/medicion-manual.md` | Completar F23, incidencias y columna "Inicial" de F26 sobre el commit `75f596c`; conteos manuales y evidencia de PHPUnit sin cambios de código. |
+| `7143513` | Persona 2 (Jhon Richard Daniel Guillen Hurtado) | `docs/calidad/Informe-Calidad.md`, `F23-inventario.md`, `F26-medicion.md`, `evidencias/medicion-manual.md` | Completar F23, incidencias y columna "Inicial" de F26 sobre el commit `75f596c`; conteos manuales y evidencia de PHPUnit sin cambios de código. |
 
 ---
 
