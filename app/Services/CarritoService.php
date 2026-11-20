@@ -30,4 +30,19 @@ class CarritoService
             ->get()
             ->getResultArray();
     }
+
+    /**
+     * Suma precio * cantidad. Se conserva el valor inicial entero 0 del
+     * controlador original para no cambiar el tipo del total en el JSON.
+     */
+    public function calcularTotal($items)
+    {
+        $total = 0;
+
+        foreach ($items as $item) {
+            $total += $item['precio'] * $item['cantidad'];
+        }
+
+        return $total;
+    }
 }

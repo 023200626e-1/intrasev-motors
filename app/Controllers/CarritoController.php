@@ -36,11 +36,7 @@ class CarritoController extends Controller
         $carritoService = new CarritoService();
 
         $items = $carritoService->obtenerItems($id_usuario);
-        $total = 0;
-
-        foreach ($items as $item) {
-            $total += $item['precio'] * $item['cantidad'];
-        }
+        $total = $carritoService->calcularTotal($items);
 
         return $this->response->setJSON([
             'success' => true,
@@ -174,14 +170,14 @@ class CarritoController extends Controller
             return redirect()->to('public/')->with('error', 'Tu carrito está vacío.');
         }
 
-        $total = 0;
         foreach ($items as $item) {
             if ($item['cantidad'] > $item['stock']) {
                 // Flash message for user
                 return redirect()->to('public/')->with('error', 'El producto "' . $item['nombre'] . '" excedió el stock disponible. Ajusta la cantidad.');
             }
-            $total += $item['precio'] * $item['cantidad'];
         }
+
+        $total = $carritoService->calcularTotal($items);
 
         // Crear o actualizar pedido "Pendiente"
         $pedidoModel = new PedidoModel();
@@ -233,7 +229,6 @@ class CarritoController extends Controller
             return $this->response->setJSON(['success' => false, 'message' => 'Tu carrito está vacío.']);
         }
 
-        $total = 0;
         foreach ($items as $item) {
             if ($item['cantidad'] > $item['stock']) {
                 return $this->response->setJSON([
@@ -241,8 +236,9 @@ class CarritoController extends Controller
                     'message' => 'El producto "' . $item['nombre'] . '" ya no tiene stock (' . $item['stock'] . ' disp).'
                 ]);
             }
-            $total += $item['precio'] * $item['cantidad'];
         }
+
+        $total = $carritoService->calcularTotal($items);
 
         // Procesar compra y pago
         $db->transStart();
@@ -302,10 +298,7 @@ class CarritoController extends Controller
             return $this->response->setJSON(['success' => true]);
         }
 
-        $total = 0;
-        foreach ($items as $item) {
-            $total += $item['precio'] * $item['cantidad'];
-        }
+        $total = $carritoService->calcularTotal($items);
 
         $db->transStart();
 
