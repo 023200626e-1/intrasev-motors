@@ -15,6 +15,9 @@ class CarritoController extends Controller
     private const ACCION_SUMAR      = 'sumar';
     private const ACCION_RESTAR     = 'restar';
     private const ACCION_FIJAR      = 'fijar';
+    private const ESTADO_PENDIENTE  = 'Pendiente';
+    private const ESTADO_PAGADO     = 'Pagado';
+    private const ESTADO_CANCELADO  = 'Cancelado';
 
     // Método de prueba temporal — Acceder desde el navegador: /index.php/carrito/test
     public function test()
@@ -204,7 +207,7 @@ class CarritoController extends Controller
         
         if ($id_pedido_pendiente) {
             // Actualizar total
-            $pedidoModel->update($id_pedido_pendiente, ['monto_total' => $total, 'estado_pedido' => 'Pendiente']);
+            $pedidoModel->update($id_pedido_pendiente, ['monto_total' => $total, 'estado_pedido' => self::ESTADO_PENDIENTE]);
             // Borrar detalles viejos y recrear
             $detalleModel->where('id_pedido', $id_pedido_pendiente)->delete();
         } else {
@@ -213,7 +216,7 @@ class CarritoController extends Controller
                 'id_usuario' => $id_usuario,
                 'fecha_pedido' => date('Y-m-d H:i:s'),
                 'monto_total' => $total,
-                'estado_pedido' => 'Pendiente'
+                'estado_pedido' => self::ESTADO_PENDIENTE
             ]);
             $id_pedido_pendiente = $pedidoModel->getInsertID();
             session()->set('id_pedido_pendiente', $id_pedido_pendiente);
@@ -265,7 +268,7 @@ class CarritoController extends Controller
         if ($id_pedido_pendiente) {
             $pedidoModel->update($id_pedido_pendiente, [
                 'monto_total' => $total,
-                'estado_pedido' => 'Pagado'
+                'estado_pedido' => self::ESTADO_PAGADO
             ]);
             $id_pedido = $id_pedido_pendiente;
             session()->remove('id_pedido_pendiente');
@@ -274,7 +277,7 @@ class CarritoController extends Controller
                 'id_usuario' => $id_usuario,
                 'fecha_pedido' => date('Y-m-d H:i:s'),
                 'monto_total' => $total,
-                'estado_pedido' => 'Pagado'
+                'estado_pedido' => self::ESTADO_PAGADO
             ]);
             $id_pedido = $pedidoModel->getInsertID();
         }
@@ -323,7 +326,7 @@ class CarritoController extends Controller
 
         if ($id_pedido_pendiente) {
             $pedidoModel->update($id_pedido_pendiente, [
-                'estado_pedido' => 'Cancelado'
+                'estado_pedido' => self::ESTADO_CANCELADO
             ]);
             session()->remove('id_pedido_pendiente');
         } else {
@@ -331,7 +334,7 @@ class CarritoController extends Controller
                 'id_usuario' => $id_usuario,
                 'fecha_pedido' => date('Y-m-d H:i:s'),
                 'monto_total' => $total,
-                'estado_pedido' => 'Cancelado'
+                'estado_pedido' => self::ESTADO_CANCELADO
             ]);
             $id_pedido = $pedidoModel->getInsertID();
             
