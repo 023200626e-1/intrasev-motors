@@ -108,7 +108,7 @@ Indicadores manuales repetibles, sin PHPStan ni PHPMD, por indicación del docen
 | `40b1768` | Persona 4 (Richard Triveños Llacta) | `app/Services/CarritoService.php`, `app/Controllers/CarritoController.php` | Paso 4 de R1: centralizar `calcularTotal()` conservando `$total = 0` entero; controlador sin `$total +=`. |
 | `bb3b777` | Persona 4 (Richard Triveños Llacta) | `app/Services/CarritoService.php`, `app/Controllers/CarritoController.php` | Paso 5 de R1: centralizar `primerItemSinStock()`; cada método conserva su mensaje y se mantiene el orden de validaciones. |
 | `d270502` | Persona 4 (Richard Triveños Llacta) | `tests/unit/CarritoServiceTest.php`, `docs/calidad/evidencias/phpunit-r1.txt` | 5 pruebas unitarias adicionales (7 aserciones) para total y validación de stock con arreglos; suite completa 17 pruebas / 33 aserciones / 0 fallos. |
-| `(registrar con git log -1 --format=%h)` | Persona 4 (Richard Triveños Llacta) | `docs/calidad/Informe-Calidad.md`, `F24-refactorizacion.md` | Completar F24 columna R1 (DT-01, DT-02 y DT-03 parcial) y F27 con los hashes de los cinco pasos y las pruebas unitarias. |
+| `51edb7c` | Persona 4 (Richard Triveños Llacta) | `docs/calidad/Informe-Calidad.md`, `F24-refactorizacion.md` | Completar F24 columna R1 (DT-01, DT-02 y DT-03 parcial) y F27 con los hashes de los cinco pasos y las pruebas unitarias. |
 
 ---
 
