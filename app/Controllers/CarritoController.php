@@ -7,6 +7,7 @@ use App\Models\CarritoComprasModel;
 use App\Models\ProductoModel;
 use App\Models\PedidoModel;
 use App\Models\DetallePedidoModel;
+use App\Services\CarritoService;
 
 class CarritoController extends Controller
 {
@@ -31,16 +32,10 @@ class CarritoController extends Controller
     {
         if ($error = $this->checkAuth()) return $error;
 
-        $db = \Config\Database::connect();
         $id_usuario = session()->get('id_usuario');
+        $carritoService = new CarritoService();
 
-        $query = $db->table('tCarritoCompras')
-                    ->select('tCarritoCompras.id_carrito, tCarritoCompras.cantidad, tProductos.id_producto, tProductos.nombre, tProductos.precio, tProductos.imagen, tProductos.stock')
-                    ->join('tProductos', 'tProductos.id_producto = tCarritoCompras.id_producto')
-                    ->where('tCarritoCompras.id_usuario', $id_usuario)
-                    ->get();
-
-        $items = $query->getResultArray();
+        $items = $carritoService->obtenerItems($id_usuario);
         $total = 0;
 
         foreach ($items as $item) {
