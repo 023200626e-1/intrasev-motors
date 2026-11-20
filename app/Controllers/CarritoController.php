@@ -28,6 +28,19 @@ class CarritoController extends Controller
         return null; // OK
     }
 
+    /**
+     * Elimina el item al llegar a cero y lo actualiza en cualquier otro caso.
+     */
+    private function guardarCantidad($carritoModel, $idCarrito, $nuevaCantidad)
+    {
+        if ($nuevaCantidad <= 0) {
+            $carritoModel->delete($idCarrito);
+            return;
+        }
+
+        $carritoModel->update($idCarrito, ['cantidad' => $nuevaCantidad]);
+    }
+
     public function obtener()
     {
         if ($error = $this->checkAuth()) return $error;
@@ -111,21 +124,13 @@ class CarritoController extends Controller
             $carritoModel->update($id_carrito, ['cantidad' => $nuevaCantidad]);
         } else if ($accion === 'restar') {
             $nuevaCantidad = $item['cantidad'] - 1;
-            if ($nuevaCantidad <= 0) {
-                $carritoModel->delete($id_carrito);
-            } else {
-                $carritoModel->update($id_carrito, ['cantidad' => $nuevaCantidad]);
-            }
+            $this->guardarCantidad($carritoModel, $id_carrito, $nuevaCantidad);
         } else if ($accion === 'fijar') {
             $nuevaCantidad = (int)$this->request->getPost('cantidad');
             if ($nuevaCantidad > $producto['stock']) {
                 $nuevaCantidad = $producto['stock'];
             }
-            if ($nuevaCantidad <= 0) {
-                $carritoModel->delete($id_carrito);
-            } else {
-                $carritoModel->update($id_carrito, ['cantidad' => $nuevaCantidad]);
-            }
+            $this->guardarCantidad($carritoModel, $id_carrito, $nuevaCantidad);
         }
 
         return $this->response->setJSON(['success' => true]);
