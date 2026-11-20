@@ -1,0 +1,813 @@
+diff --git a/app/Controllers/CarritoController.php b/app/Controllers/CarritoController.php
+index 62affb1..ed18ab5 100644
+--- a/app/Controllers/CarritoController.php
++++ b/app/Controllers/CarritoController.php
+@@ -7,9 +7,18 @@ use App\Models\CarritoComprasModel;
+ use App\Models\ProductoModel;
+ use App\Models\PedidoModel;
+ use App\Models\DetallePedidoModel;
++use App\Services\CarritoService;
+ 
+ class CarritoController extends Controller
+ {
++    private const ROL_ADMINISTRADOR = 1;
++    private const ACCION_SUMAR      = 'sumar';
++    private const ACCION_RESTAR     = 'restar';
++    private const ACCION_FIJAR      = 'fijar';
++    private const ESTADO_PENDIENTE  = 'Pendiente';
++    private const ESTADO_PAGADO     = 'Pagado';
++    private const ESTADO_CANCELADO  = 'Cancelado';
++
+     // Método de prueba temporal — Acceder desde el navegador: /index.php/carrito/test
+     public function test()
+     {
+@@ -21,31 +30,42 @@ class CarritoController extends Controller
+         if (!session()->has('id_usuario')) {
+             return $this->response->setJSON(['success' => false, 'message' => 'Debes iniciar sesión para comprar.']);
+         }
+-        if (session()->get('id_rol') == 1) {
++        if (session()->get('id_rol') == self::ROL_ADMINISTRADOR) {
+             return $this->response->setJSON(['success' => false, 'message' => 'Los administradores no pueden realizar compras.']);
+         }
+         return null; // OK
+     }
+ 
++    /**
++     * Elimina el item al llegar a cero y lo actualiza en cualquier otro caso.
++     */
++    private function guardarCantidad($carritoModel, $idCarrito, $nuevaCantidad)
++    {
++        if ($nuevaCantidad <= 0) {
++            $carritoModel->delete($idCarrito);
++            return;
++        }
++
++        $carritoModel->update($idCarrito, ['cantidad' => $nuevaCantidad]);
++    }
++
++    /**
++     * Comprueba que el item existe y pertenece al usuario en sesión.
++     */
++    private function esItemDelUsuario($item)
++    {
++        return $item && $item['id_usuario'] == session()->get('id_usuario');
++    }
++
+     public function obtener()
+     {
+         if ($error = $this->checkAuth()) return $error;
+ 
+-        $db = \Config\Database::connect();
+         $id_usuario = session()->get('id_usuario');
++        $carritoService = new CarritoService();
+ 
+-        $query = $db->table('tCarritoCompras')
+-                    ->select('tCarritoCompras.id_carrito, tCarritoCompras.cantidad, tProductos.id_producto, tProductos.nombre, tProductos.precio, tProductos.imagen, tProductos.stock')
+-                    ->join('tProductos', 'tProductos.id_producto = tCarritoCompras.id_producto')
+-                    ->where('tCarritoCompras.id_usuario', $id_usuario)
+-                    ->get();
+-
+-        $items = $query->getResultArray();
+-        $total = 0;
+-
+-        foreach ($items as $item) {
+-            $total += $item['precio'] * $item['cantidad'];
+-        }
++        $items = $carritoService->obtenerItems($id_usuario);
++        $total = $carritoService->calcularTotal($items);
+ 
+         return $this->response->setJSON([
+             'success' => true,
+@@ -100,41 +120,33 @@ class CarritoController extends Controller
+         if ($error = $this->checkAuth()) return $error;
+ 
+         $id_carrito = $this->request->getPost('id_carrito');
+-        $accion = $this->request->getPost('accion'); // 'sumar' o 'restar'
++        $accion = $this->request->getPost('accion'); // 'sumar', 'restar' o 'fijar'
+ 
+         $carritoModel = new CarritoComprasModel();
+         $productoModel = new ProductoModel();
+ 
+         $item = $carritoModel->find($id_carrito);
+-        if (!$item || $item['id_usuario'] != session()->get('id_usuario')) {
++        if (!$this->esItemDelUsuario($item)) {
+             return $this->response->setJSON(['success' => false, 'message' => 'Item no válido.']);
+         }
+ 
+         $producto = $productoModel->find($item['id_producto']);
+         
+-        if ($accion === 'sumar') {
++        if ($accion === self::ACCION_SUMAR) {
+             $nuevaCantidad = $item['cantidad'] + 1;
+             if ($nuevaCantidad > $producto['stock']) {
+                 return $this->response->setJSON(['success' => false, 'message' => 'Solo tenemos ' . $producto['stock'] . ' unidades disponibles de este producto.']);
+             }
+             $carritoModel->update($id_carrito, ['cantidad' => $nuevaCantidad]);
+-        } else if ($accion === 'restar') {
++        } else if ($accion === self::ACCION_RESTAR) {
+             $nuevaCantidad = $item['cantidad'] - 1;
+-            if ($nuevaCantidad <= 0) {
+-                $carritoModel->delete($id_carrito);
+-            } else {
+-                $carritoModel->update($id_carrito, ['cantidad' => $nuevaCantidad]);
+-            }
+-        } else if ($accion === 'fijar') {
++            $this->guardarCantidad($carritoModel, $id_carrito, $nuevaCantidad);
++        } else if ($accion === self::ACCION_FIJAR) {
+             $nuevaCantidad = (int)$this->request->getPost('cantidad');
+             if ($nuevaCantidad > $producto['stock']) {
+                 $nuevaCantidad = $producto['stock'];
+             }
+-            if ($nuevaCantidad <= 0) {
+-                $carritoModel->delete($id_carrito);
+-            } else {
+-                $carritoModel->update($id_carrito, ['cantidad' => $nuevaCantidad]);
+-            }
++            $this->guardarCantidad($carritoModel, $id_carrito, $nuevaCantidad);
+         }
+ 
+         return $this->response->setJSON(['success' => true]);
+@@ -149,7 +161,7 @@ class CarritoController extends Controller
+         
+         // Medida de seguridad
+         $item = $carritoModel->find($id_carrito);
+-        if ($item && $item['id_usuario'] == session()->get('id_usuario')) {
++        if ($this->esItemDelUsuario($item)) {
+             $carritoModel->delete($id_carrito);
+         }
+ 
+@@ -170,30 +182,23 @@ class CarritoController extends Controller
+     {
+         if ($error = $this->checkAuth()) return redirect()->to('login');
+ 
+-        $db = \Config\Database::connect();
+         $id_usuario = session()->get('id_usuario');
++        $carritoService = new CarritoService();
+ 
+-        $query = $db->table('tCarritoCompras')
+-                    ->select('tCarritoCompras.cantidad, tProductos.id_producto, tProductos.precio, tProductos.stock, tProductos.nombre, tProductos.imagen')
+-                    ->join('tProductos', 'tProductos.id_producto = tCarritoCompras.id_producto')
+-                    ->where('tCarritoCompras.id_usuario', $id_usuario)
+-                    ->get();
+-
+-        $items = $query->getResultArray();
++        $items = $carritoService->obtenerItems($id_usuario);
+ 
+         if (empty($items)) {
+             return redirect()->to('public/')->with('error', 'Tu carrito está vacío.');
+         }
+ 
+-        $total = 0;
+-        foreach ($items as $item) {
+-            if ($item['cantidad'] > $item['stock']) {
+-                // Flash message for user
+-                return redirect()->to('public/')->with('error', 'El producto "' . $item['nombre'] . '" excedió el stock disponible. Ajusta la cantidad.');
+-            }
+-            $total += $item['precio'] * $item['cantidad'];
++        $itemSinStock = $carritoService->primerItemSinStock($items);
++        if ($itemSinStock !== null) {
++            // Flash message for user
++            return redirect()->to('public/')->with('error', 'El producto "' . $itemSinStock['nombre'] . '" excedió el stock disponible. Ajusta la cantidad.');
+         }
+ 
++        $total = $carritoService->calcularTotal($items);
++
+         // Crear o actualizar pedido "Pendiente"
+         $pedidoModel = new PedidoModel();
+         $detalleModel = new DetallePedidoModel();
+@@ -202,7 +207,7 @@ class CarritoController extends Controller
+         
+         if ($id_pedido_pendiente) {
+             // Actualizar total
+-            $pedidoModel->update($id_pedido_pendiente, ['monto_total' => $total, 'estado_pedido' => 'Pendiente']);
++            $pedidoModel->update($id_pedido_pendiente, ['monto_total' => $total, 'estado_pedido' => self::ESTADO_PENDIENTE]);
+             // Borrar detalles viejos y recrear
+             $detalleModel->where('id_pedido', $id_pedido_pendiente)->delete();
+         } else {
+@@ -211,7 +216,7 @@ class CarritoController extends Controller
+                 'id_usuario' => $id_usuario,
+                 'fecha_pedido' => date('Y-m-d H:i:s'),
+                 'monto_total' => $total,
+-                'estado_pedido' => 'Pendiente'
++                'estado_pedido' => self::ESTADO_PENDIENTE
+             ]);
+             $id_pedido_pendiente = $pedidoModel->getInsertID();
+             session()->set('id_pedido_pendiente', $id_pedido_pendiente);
+@@ -236,30 +241,24 @@ class CarritoController extends Controller
+ 
+         $id_usuario = session()->get('id_usuario');
+         $db = \Config\Database::connect();
+-        
+-        $query = $db->table('tCarritoCompras')
+-                    ->select('tCarritoCompras.cantidad, tProductos.id_producto, tProductos.precio, tProductos.stock, tProductos.nombre')
+-                    ->join('tProductos', 'tProductos.id_producto = tCarritoCompras.id_producto')
+-                    ->where('tCarritoCompras.id_usuario', $id_usuario)
+-                    ->get();
++        $carritoService = new CarritoService();
+ 
+-        $items = $query->getResultArray();
++        $items = $carritoService->obtenerItems($id_usuario);
+ 
+         if (empty($items)) {
+             return $this->response->setJSON(['success' => false, 'message' => 'Tu carrito está vacío.']);
+         }
+ 
+-        $total = 0;
+-        foreach ($items as $item) {
+-            if ($item['cantidad'] > $item['stock']) {
+-                return $this->response->setJSON([
+-                    'success' => false, 
+-                    'message' => 'El producto "' . $item['nombre'] . '" ya no tiene stock (' . $item['stock'] . ' disp).'
+-                ]);
+-            }
+-            $total += $item['precio'] * $item['cantidad'];
++        $itemSinStock = $carritoService->primerItemSinStock($items);
++        if ($itemSinStock !== null) {
++            return $this->response->setJSON([
++                'success' => false,
++                'message' => 'El producto "' . $itemSinStock['nombre'] . '" ya no tiene stock (' . $itemSinStock['stock'] . ' disp).'
++            ]);
+         }
+ 
++        $total = $carritoService->calcularTotal($items);
++
+         // Procesar compra y pago
+         $db->transStart();
+ 
+@@ -269,7 +268,7 @@ class CarritoController extends Controller
+         if ($id_pedido_pendiente) {
+             $pedidoModel->update($id_pedido_pendiente, [
+                 'monto_total' => $total,
+-                'estado_pedido' => 'Pagado'
++                'estado_pedido' => self::ESTADO_PAGADO
+             ]);
+             $id_pedido = $id_pedido_pendiente;
+             session()->remove('id_pedido_pendiente');
+@@ -278,7 +277,7 @@ class CarritoController extends Controller
+                 'id_usuario' => $id_usuario,
+                 'fecha_pedido' => date('Y-m-d H:i:s'),
+                 'monto_total' => $total,
+-                'estado_pedido' => 'Pagado'
++                'estado_pedido' => self::ESTADO_PAGADO
+             ]);
+             $id_pedido = $pedidoModel->getInsertID();
+         }
+@@ -310,23 +309,15 @@ class CarritoController extends Controller
+ 
+         $id_usuario = session()->get('id_usuario');
+         $db = \Config\Database::connect();
+-        
+-        $query = $db->table('tCarritoCompras')
+-                    ->select('tCarritoCompras.cantidad, tProductos.id_producto, tProductos.precio, tProductos.stock, tProductos.nombre')
+-                    ->join('tProductos', 'tProductos.id_producto = tCarritoCompras.id_producto')
+-                    ->where('tCarritoCompras.id_usuario', $id_usuario)
+-                    ->get();
++        $carritoService = new CarritoService();
+ 
+-        $items = $query->getResultArray();
++        $items = $carritoService->obtenerItems($id_usuario);
+ 
+         if (empty($items)) {
+             return $this->response->setJSON(['success' => true]);
+         }
+ 
+-        $total = 0;
+-        foreach ($items as $item) {
+-            $total += $item['precio'] * $item['cantidad'];
+-        }
++        $total = $carritoService->calcularTotal($items);
+ 
+         $db->transStart();
+ 
+@@ -335,7 +326,7 @@ class CarritoController extends Controller
+ 
+         if ($id_pedido_pendiente) {
+             $pedidoModel->update($id_pedido_pendiente, [
+-                'estado_pedido' => 'Cancelado'
++                'estado_pedido' => self::ESTADO_CANCELADO
+             ]);
+             session()->remove('id_pedido_pendiente');
+         } else {
+@@ -343,7 +334,7 @@ class CarritoController extends Controller
+                 'id_usuario' => $id_usuario,
+                 'fecha_pedido' => date('Y-m-d H:i:s'),
+                 'monto_total' => $total,
+-                'estado_pedido' => 'Cancelado'
++                'estado_pedido' => self::ESTADO_CANCELADO
+             ]);
+             $id_pedido = $pedidoModel->getInsertID();
+             
+diff --git a/app/Services/CarritoService.php b/app/Services/CarritoService.php
+new file mode 100644
+index 0000000..408649d
+--- /dev/null
++++ b/app/Services/CarritoService.php
+@@ -0,0 +1,64 @@
++<?php
++
++namespace App\Services;
++
++use Config\Database;
++
++/**
++ * Reglas compartidas del carrito: consulta de items, total y validación de stock.
++ */
++class CarritoService
++{
++    private $db;
++
++    public function __construct()
++    {
++        $this->db = Database::connect();
++    }
++
++    /**
++     * Devuelve los items del carrito de un usuario unidos con el producto.
++     * La lista de columnas es la del método obtener() original, que contiene
++     * todas las columnas usadas por los demás métodos del controlador.
++     */
++    public function obtenerItems($idUsuario): array
++    {
++        return $this->db->table('tCarritoCompras')
++            ->select('tCarritoCompras.id_carrito, tCarritoCompras.cantidad, tProductos.id_producto, tProductos.nombre, tProductos.precio, tProductos.imagen, tProductos.stock')
++            ->join('tProductos', 'tProductos.id_producto = tCarritoCompras.id_producto')
++            ->where('tCarritoCompras.id_usuario', $idUsuario)
++            ->get()
++            ->getResultArray();
++    }
++
++    /**
++     * Suma precio * cantidad. Se conserva el valor inicial entero 0 del
++     * controlador original para no cambiar el tipo del total en el JSON.
++     */
++    public function calcularTotal($items)
++    {
++        $total = 0;
++
++        foreach ($items as $item) {
++            $total += $item['precio'] * $item['cantidad'];
++        }
++
++        return $total;
++    }
++
++    /**
++     * Devuelve el primer item cuya cantidad supera el stock, o null.
++     * El controlador conserva sus propios mensajes porque checkout y
++     * procesar_pago informan el problema de formas distintas.
++     */
++    public function primerItemSinStock($items)
++    {
++        foreach ($items as $item) {
++            if ($item['cantidad'] > $item['stock']) {
++                return $item;
++            }
++        }
++
++        return null;
++    }
++}
+diff --git a/tests/feature/CarritoActualizarTest.php b/tests/feature/CarritoActualizarTest.php
+new file mode 100644
+index 0000000..16055c5
+--- /dev/null
++++ b/tests/feature/CarritoActualizarTest.php
+@@ -0,0 +1,178 @@
++<?php
++
++namespace Tests\Feature;
++
++use CodeIgniter\Test\CIUnitTestCase;
++use CodeIgniter\Test\DatabaseTestTrait;
++use CodeIgniter\Test\FeatureTestTrait;
++
++/**
++ * Regresión adicional para R2: protege las cuatro rutas de actualizar().
++ *
++ * @internal
++ */
++final class CarritoActualizarTest extends CIUnitTestCase
++{
++    use DatabaseTestTrait;
++    use FeatureTestTrait;
++
++    protected $migrate   = true;
++    protected $refresh   = true;
++    protected $namespace = 'App';
++
++    /**
++     * @return array{id_usuario:int, id_producto:int}
++     */
++    private function crearContexto(int $stock): array
++    {
++        $this->db->table('tRoles')->insert([
++            'id_rol'     => 2,
++            'nombre_rol' => 'Cliente',
++        ]);
++
++        $this->db->table('tUsuarios')->insert([
++            'id_usuario'         => 1,
++            'id_rol'             => 2,
++            'usuario'            => 'cliente_actualizar',
++            'nombre_completo'    => 'Cliente de prueba',
++            'correo_electronico' => 'cliente_actualizar@example.com',
++            'contrasena_hash'    => 'hash',
++            'fecha_creacion'     => date('Y-m-d H:i:s'),
++        ]);
++
++        $this->db->table('tProductos')->insert([
++            'nombre' => 'Producto de actualizacion',
++            'precio' => 10.00,
++            'stock'  => $stock,
++        ]);
++
++        return [
++            'id_usuario'  => 1,
++            'id_producto' => (int) $this->db->insertID(),
++        ];
++    }
++
++    private function insertarItem(array $contexto, int $cantidad): int
++    {
++        $this->db->table('tCarritoCompras')->insert([
++            'id_usuario'     => $contexto['id_usuario'],
++            'id_producto'    => $contexto['id_producto'],
++            'cantidad'       => $cantidad,
++            'fecha_agregado' => date('Y-m-d H:i:s'),
++        ]);
++
++        return (int) $this->db->insertID();
++    }
++
++    private function cantidadDe(int $idCarrito): int
++    {
++        $item = $this->db->table('tCarritoCompras')
++            ->where('id_carrito', $idCarrito)->get()->getRowArray();
++
++        return (int) $item['cantidad'];
++    }
++
++    private function sesionCliente(): array
++    {
++        return ['id_usuario' => 1, 'id_rol' => 2];
++    }
++
++    public function testSumarRechazaAlSuperarStock(): void
++    {
++        $contexto  = $this->crearContexto(2);
++        $idCarrito = $this->insertarItem($contexto, 2);
++
++        $response = $this->withSession($this->sesionCliente())
++            ->post('carrito/actualizar', [
++                'id_carrito' => $idCarrito,
++                'accion'     => 'sumar',
++            ]);
++        $json = json_decode($response->getJSON(), true);
++
++        $this->assertFalse($json['success']);
++        $this->assertSame('Solo tenemos 2 unidades disponibles de este producto.', $json['message']);
++        $this->assertSame(2, $this->cantidadDe($idCarrito));
++    }
++
++    public function testFijarAjustaLaCantidadAlStock(): void
++    {
++        $contexto  = $this->crearContexto(2);
++        $idCarrito = $this->insertarItem($contexto, 1);
++
++        $response = $this->withSession($this->sesionCliente())
++            ->post('carrito/actualizar', [
++                'id_carrito' => $idCarrito,
++                'accion'     => 'fijar',
++                'cantidad'   => 5,
++            ]);
++        $json = json_decode($response->getJSON(), true);
++
++        $this->assertTrue($json['success']);
++        $this->assertSame(2, $this->cantidadDe($idCarrito));
++    }
++
++    public function testFijarCeroEliminaElItem(): void
++    {
++        $contexto  = $this->crearContexto(5);
++        $idCarrito = $this->insertarItem($contexto, 1);
++
++        $response = $this->withSession($this->sesionCliente())
++            ->post('carrito/actualizar', [
++                'id_carrito' => $idCarrito,
++                'accion'     => 'fijar',
++                'cantidad'   => 0,
++            ]);
++        $json = json_decode($response->getJSON(), true);
++
++        $this->assertTrue($json['success']);
++        $this->assertSame(0, $this->db->table('tCarritoCompras')
++            ->where('id_carrito', $idCarrito)->countAllResults());
++    }
++
++    public function testItemDeOtroUsuarioEsRechazado(): void
++    {
++        $contexto = $this->crearContexto(5);
++
++        $this->db->table('tUsuarios')->insert([
++            'id_usuario'         => 2,
++            'id_rol'             => 2,
++            'usuario'            => 'otro_cliente',
++            'nombre_completo'    => 'Otro cliente',
++            'correo_electronico' => 'otro_cliente@example.com',
++            'contrasena_hash'    => 'hash',
++            'fecha_creacion'     => date('Y-m-d H:i:s'),
++        ]);
++
++        $idCarrito = $this->insertarItem([
++            'id_usuario'  => 2,
++            'id_producto' => $contexto['id_producto'],
++        ], 1);
++
++        $response = $this->withSession($this->sesionCliente())
++            ->post('carrito/actualizar', [
++                'id_carrito' => $idCarrito,
++                'accion'     => 'sumar',
++            ]);
++        $json = json_decode($response->getJSON(), true);
++
++        $this->assertFalse($json['success']);
++        $this->assertSame('Item no válido.', $json['message']);
++        $this->assertSame(1, $this->cantidadDe($idCarrito));
++    }
++
++    public function testAccionDesconocidaNoCambiaElItem(): void
++    {
++        $contexto  = $this->crearContexto(5);
++        $idCarrito = $this->insertarItem($contexto, 1);
++
++        $response = $this->withSession($this->sesionCliente())
++            ->post('carrito/actualizar', [
++                'id_carrito' => $idCarrito,
++                'accion'     => 'otra',
++            ]);
++        $json = json_decode($response->getJSON(), true);
++
++        $this->assertTrue($json['success']);
++        $this->assertSame(1, $this->cantidadDe($idCarrito));
++    }
++}
+diff --git a/tests/feature/CarritoTest.php b/tests/feature/CarritoTest.php
+new file mode 100644
+index 0000000..a550335
+--- /dev/null
++++ b/tests/feature/CarritoTest.php
+@@ -0,0 +1,177 @@
++<?php
++
++namespace Tests\Feature;
++
++use CodeIgniter\Test\CIUnitTestCase;
++use CodeIgniter\Test\DatabaseTestTrait;
++use CodeIgniter\Test\FeatureTestTrait;
++
++/**
++ * @internal
++ */
++final class CarritoTest extends CIUnitTestCase
++{
++    use DatabaseTestTrait;
++    use FeatureTestTrait;
++
++    protected $migrate   = true;
++    protected $refresh   = true;
++    protected $namespace = 'App';
++
++    /**
++     * Datos mínimos compartidos: rol cliente, usuario y producto.
++     *
++     * @return array{id_usuario:int, id_producto:int}
++     */
++    private function crearContexto(int $stock = 5, string $nombre = 'Producto de prueba'): array
++    {
++        $this->db->table('tRoles')->insert([
++            'id_rol'     => 2,
++            'nombre_rol' => 'Cliente',
++        ]);
++
++        $this->db->table('tUsuarios')->insert([
++            'id_usuario'         => 1,
++            'id_rol'             => 2,
++            'usuario'            => 'cliente_test',
++            'nombre_completo'    => 'Cliente de prueba',
++            'correo_electronico' => 'cliente_test@example.com',
++            'contrasena_hash'    => 'hash',
++            'fecha_creacion'     => date('Y-m-d H:i:s'),
++        ]);
++
++        $this->db->table('tProductos')->insert([
++            'nombre' => $nombre,
++            'precio' => 10.00,
++            'stock'  => $stock,
++        ]);
++
++        return [
++            'id_usuario'  => 1,
++            'id_producto' => (int) $this->db->insertID(),
++        ];
++    }
++
++    private function sesionCliente(): array
++    {
++        return ['id_usuario' => 1, 'id_rol' => 2];
++    }
++
++    private function jsonDe($response): array
++    {
++        return json_decode($response->getJSON(), true);
++    }
++
++    public function testObtenerSinSesionEsRechazado(): void
++    {
++        $response = $this->get('carrito/obtener');
++        $json     = $this->jsonDe($response);
++
++        $this->assertFalse($json['success']);
++        $this->assertSame('Debes iniciar sesión para comprar.', $json['message']);
++    }
++
++    public function testAdministradorNoPuedeAgregar(): void
++    {
++        $response = $this->withSession(['id_usuario' => 1, 'id_rol' => 1])
++            ->post('carrito/agregar', ['id_producto' => 999]);
++
++        $json = $this->jsonDe($response);
++
++        $this->assertFalse($json['success']);
++        $this->assertSame('Los administradores no pueden realizar compras.', $json['message']);
++        $this->assertSame(0, $this->db->table('tCarritoCompras')->countAllResults());
++    }
++
++    public function testAgregarSinStockEsRechazado(): void
++    {
++        $contexto = $this->crearContexto(0);
++
++        $response = $this->withSession($this->sesionCliente())
++            ->post('carrito/agregar', ['id_producto' => $contexto['id_producto']]);
++
++        $json = $this->jsonDe($response);
++
++        $this->assertFalse($json['success']);
++        $this->assertSame('Producto sin stock disponible.', $json['message']);
++        $this->assertSame(0, $this->db->table('tCarritoCompras')->countAllResults());
++    }
++
++    public function testProcesarPagoRechazaCantidadMayorAlStock(): void
++    {
++        $contexto = $this->crearContexto(2, 'Laptop Gamer');
++
++        $this->db->table('tCarritoCompras')->insert([
++            'id_usuario'     => $contexto['id_usuario'],
++            'id_producto'    => $contexto['id_producto'],
++            'cantidad'       => 5,
++            'fecha_agregado' => date('Y-m-d H:i:s'),
++        ]);
++
++        $response = $this->withSession($this->sesionCliente())->post('carrito/procesar_pago');
++        $json     = $this->jsonDe($response);
++
++        $this->assertFalse($json['success']);
++        $this->assertStringContainsString('Laptop Gamer', $json['message']);
++        $this->assertStringContainsString('2 disp', $json['message']);
++
++        $producto = $this->db->table('tProductos')
++            ->where('id_producto', $contexto['id_producto'])->get()->getRowArray();
++        $this->assertSame(2, (int) $producto['stock']);
++
++        $this->assertSame(0, $this->db->table('tPedidos')->countAllResults());
++    }
++
++    public function testProcesarPagoConCantidadIgualAlStock(): void
++    {
++        $contexto = $this->crearContexto(2);
++
++        $this->db->table('tCarritoCompras')->insert([
++            'id_usuario'     => $contexto['id_usuario'],
++            'id_producto'    => $contexto['id_producto'],
++            'cantidad'       => 2,
++            'fecha_agregado' => date('Y-m-d H:i:s'),
++        ]);
++
++        $response = $this->withSession($this->sesionCliente())->post('carrito/procesar_pago');
++        $json     = $this->jsonDe($response);
++
++        $this->assertTrue($json['success']);
++        $this->assertArrayHasKey('id_pedido', $json);
++
++        $producto = $this->db->table('tProductos')
++            ->where('id_producto', $contexto['id_producto'])->get()->getRowArray();
++        $this->assertSame(0, (int) $producto['stock']);
++
++        $this->assertSame(0, $this->db->table('tCarritoCompras')->countAllResults());
++
++        $pedido = $this->db->table('tPedidos')
++            ->where('id_pedido', $json['id_pedido'])->get()->getRowArray();
++        $this->assertSame('Pagado', $pedido['estado_pedido']);
++    }
++
++    public function testActualizarRestarEliminaItem(): void
++    {
++        $contexto = $this->crearContexto(5);
++
++        $this->db->table('tCarritoCompras')->insert([
++            'id_usuario'     => $contexto['id_usuario'],
++            'id_producto'    => $contexto['id_producto'],
++            'cantidad'       => 1,
++            'fecha_agregado' => date('Y-m-d H:i:s'),
++        ]);
++        $idCarrito = $this->db->insertID();
++
++        $response = $this->withSession($this->sesionCliente())
++            ->post('carrito/actualizar', [
++                'id_carrito' => $idCarrito,
++                'accion'     => 'restar',
++            ]);
++
++        $json = $this->jsonDe($response);
++
++        $this->assertTrue($json['success']);
++        $this->assertSame(0, $this->db->table('tCarritoCompras')
++            ->where('id_carrito', $idCarrito)->countAllResults());
++    }
++}
+diff --git a/tests/unit/CarritoServiceTest.php b/tests/unit/CarritoServiceTest.php
+new file mode 100644
+index 0000000..8fbec0f
+--- /dev/null
++++ b/tests/unit/CarritoServiceTest.php
+@@ -0,0 +1,71 @@
++<?php
++
++namespace Tests\Unit;
++
++use App\Services\CarritoService;
++use CodeIgniter\Test\CIUnitTestCase;
++
++/**
++ * Pruebas unitarias adicionales: no reemplazan a las de regresión.
++ *
++ * @internal
++ */
++final class CarritoServiceTest extends CIUnitTestCase
++{
++    private CarritoService $service;
++
++    protected function setUp(): void
++    {
++        parent::setUp();
++        $this->service = new CarritoService();
++    }
++
++    public function testTotalDeCarritoVacioEsCeroEntero(): void
++    {
++        $this->assertSame(0, $this->service->calcularTotal([]));
++    }
++
++    public function testTotalSumaPrecioPorCantidad(): void
++    {
++        $items = [
++            ['precio' => 10, 'cantidad' => 2],
++            ['precio' => 3,  'cantidad' => 4],
++        ];
++
++        $this->assertSame(32, $this->service->calcularTotal($items));
++    }
++
++    public function testTotalConservaAritmeticaConPreciosDecimales(): void
++    {
++        $items = [
++            ['precio' => 10.5, 'cantidad' => 2],
++        ];
++
++        $this->assertEquals(21, $this->service->calcularTotal($items));
++    }
++
++    public function testNoHayItemSinStockCuandoTodoEstaDentroDelLimite(): void
++    {
++        $items = [
++            ['nombre' => 'A', 'cantidad' => 1, 'stock' => 3],
++            ['nombre' => 'B', 'cantidad' => 3, 'stock' => 3],
++        ];
++
++        $this->assertNull($this->service->primerItemSinStock($items));
++    }
++
++    public function testDevuelvePrimerItemQueSuperaElStock(): void
++    {
++        $items = [
++            ['nombre' => 'A', 'cantidad' => 1, 'stock' => 3],
++            ['nombre' => 'B', 'cantidad' => 5, 'stock' => 2],
++            ['nombre' => 'C', 'cantidad' => 9, 'stock' => 1],
++        ];
++
++        $item = $this->service->primerItemSinStock($items);
++
++        $this->assertNotNull($item);
++        $this->assertSame('B', $item['nombre']);
++        $this->assertSame(2, $item['stock']);
++    }
++}

@@ -1,0 +1,18 @@
+75f596c docs: preparar carpeta de evidencias, informe y pruebas iniciales
+7143513 docs: completar F23, F26 e incidencias
+5d66ad3 docs: registrar hash del commit de Persona 2 en F27
+b4f3d39 test: agregar regresion del carrito y completar F25
+b32003b docs: registrar hash del commit de Persona 3 en F27
+980534c refactor: extraer consulta de items del carrito a CarritoService
+aff4f4b refactor: usar CarritoService en checkout
+46ea5e4 refactor: usar CarritoService en los metodos de pago
+40b1768 refactor: centralizar el calculo del total en CarritoService
+bb3b777 refactor: centralizar la validacion de stock en CarritoService
+d270502 test: agregar pruebas unitarias de CarritoService
+51edb7c docs: completar F24 con R1 y F27 con los commits de Persona 4
+0148762 docs: registrar hash del commit de Persona 4 en F27
+5ab9997 test: agregar regresion de actualizar para R2
+2fd477e refactor: extraer guardarCantidad en actualizar
+34eb4af refactor: extraer validacion de pertenencia del item
+af4eb21 refactor: usar constantes para rol y acciones
+f319f92 refactor: reemplazar estados de pedido por constantes

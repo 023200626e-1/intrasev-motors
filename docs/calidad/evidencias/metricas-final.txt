@@ -1,0 +1,44 @@
+# Medición manual "después" - módulo Carrito
+
+- Commit del código medido: `f319f92` (`git rev-parse --short HEAD` después de R2).
+- Los commits posteriores a este punto son solo documentación; el código no cambia.
+- No se usaron PHPStan ni PHPMD, por indicación del docente.
+
+## Archivos medidos
+
+- `app/Controllers/CarritoController.php`: 366 líneas, SHA-256 `ffb63fdc0798c15888a24deb43a9a56b917b24a664da41c8dd0480964a6023ef`.
+- `app/Services/CarritoService.php`: 64 líneas, SHA-256 `0d4dc6f0946e1d5742ff1aab50873f20b5cf50ad21867f0adaa7902bc9a08624`.
+- Total del módulo (controlador + servicio): 430 líneas.
+
+## Comandos repetidos (mismo criterio de la Persona 2)
+
+```powershell
+(Get-Content app\Controllers\CarritoController.php).Count
+(Select-String -Path app\Controllers\CarritoController.php,app\Services\CarritoService.php -SimpleMatch "join('tProductos'").Count
+(Select-String -Path app\Controllers\CarritoController.php,app\Services\CarritoService.php -SimpleMatch '$total +=').Count
+(Select-String -Path app\Controllers\CarritoController.php,app\Services\CarritoService.php -SimpleMatch "['cantidad'] > ").Count
+Select-String -Path app\Controllers\CarritoController.php -Pattern 'function (procesar_pago|actualizar)'
+```
+
+## Resultados
+
+| Indicador | Inicial | Final |
+| :--- | :--- | :--- |
+| Líneas del controlador | 375 | 366 |
+| Líneas del servicio | 0 (no existía) | 64 |
+| Líneas del módulo | 375 | 430 |
+| Copias de `join('tProductos'` | 4 | 1 (controlador 0, servicio 1) |
+| Bucles `$total +=` | 4 | 1 (controlador 0, servicio 1) |
+| Comparaciones `['cantidad'] >` (indicador adicional) | no medido | 1 (controlador 0, servicio 1) |
+| Complejidad de `procesar_pago` | 8 | 7 (líneas 238-304; if=5, foreach=1, &&=0, ||=0, ?:=0, ??=0; +1) |
+| Complejidad de `actualizar` | 11 | 8 (líneas 118-153; if=7, foreach=0, &&=0, ||=0, ?:=0, ??=0; +1) |
+
+## Desglose de complejidad final
+
+| Método | `if` | `foreach` | `&&` | `||` | `?:` | `??` | +1 | Complejidad |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| `procesar_pago` (238-304) | 5 | 1 | 0 | 0 | 0 | 0 | 1 | **7** |
+| `actualizar` (118-153) | 7 | 0 | 0 | 0 | 0 | 0 | 1 | **8** |
+| `obtener` (60-75) | 1 | 0 | 0 | 0 | 0 | 0 | 1 | **2** |
+| `checkout` (181-236) | 4 | 1 | 0 | 0 | 0 | 0 | 1 | **6** |
+| `cancelar_pago` (306-359) | 3 | 1 | 0 | 0 | 0 | 0 | 1 | **5** |

@@ -78,3 +78,5 @@ La suite actual cubre `tests/unit/PrestamoServiceMantenimientoTest.php`; todaví
 3. Para las copias de la consulta y los bucles de total, contar **juntos** `app/Controllers/CarritoController.php` y `app/Services/CarritoService.php`. Antes el servicio no existía y sumaba cero, así que el alcance del módulo es comparable.
 4. Llenar la columna "Final" de F26 e interpretar cada cifra, incluidas las que suban (por ejemplo, el total de líneas del módulo puede aumentar al aparecer el servicio).
 5. Guardar la salida de PHPUnit en `docs/calidad/evidencias/phpunit-despues.txt` y no cambiar las expectativas de las pruebas de regresión.
+
+**Repetición final (Persona 5):** ejecutada sobre el commit de código `f319f92`. Resultados y desglose en `docs/calidad/evidencias/metricas-final.txt`; diff real en `docs/calidad/evidencias/diff-final.patch`.
