@@ -225,14 +225,9 @@ class CarritoController extends Controller
 
         $id_usuario = session()->get('id_usuario');
         $db = \Config\Database::connect();
-        
-        $query = $db->table('tCarritoCompras')
-                    ->select('tCarritoCompras.cantidad, tProductos.id_producto, tProductos.precio, tProductos.stock, tProductos.nombre')
-                    ->join('tProductos', 'tProductos.id_producto = tCarritoCompras.id_producto')
-                    ->where('tCarritoCompras.id_usuario', $id_usuario)
-                    ->get();
+        $carritoService = new CarritoService();
 
-        $items = $query->getResultArray();
+        $items = $carritoService->obtenerItems($id_usuario);
 
         if (empty($items)) {
             return $this->response->setJSON(['success' => false, 'message' => 'Tu carrito está vacío.']);
@@ -299,14 +294,9 @@ class CarritoController extends Controller
 
         $id_usuario = session()->get('id_usuario');
         $db = \Config\Database::connect();
-        
-        $query = $db->table('tCarritoCompras')
-                    ->select('tCarritoCompras.cantidad, tProductos.id_producto, tProductos.precio, tProductos.stock, tProductos.nombre')
-                    ->join('tProductos', 'tProductos.id_producto = tCarritoCompras.id_producto')
-                    ->where('tCarritoCompras.id_usuario', $id_usuario)
-                    ->get();
+        $carritoService = new CarritoService();
 
-        $items = $query->getResultArray();
+        $items = $carritoService->obtenerItems($id_usuario);
 
         if (empty($items)) {
             return $this->response->setJSON(['success' => true]);
