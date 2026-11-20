@@ -11,6 +11,11 @@ use App\Services\CarritoService;
 
 class CarritoController extends Controller
 {
+    private const ROL_ADMINISTRADOR = 1;
+    private const ACCION_SUMAR      = 'sumar';
+    private const ACCION_RESTAR     = 'restar';
+    private const ACCION_FIJAR      = 'fijar';
+
     // Método de prueba temporal — Acceder desde el navegador: /index.php/carrito/test
     public function test()
     {
@@ -22,7 +27,7 @@ class CarritoController extends Controller
         if (!session()->has('id_usuario')) {
             return $this->response->setJSON(['success' => false, 'message' => 'Debes iniciar sesión para comprar.']);
         }
-        if (session()->get('id_rol') == 1) {
+        if (session()->get('id_rol') == self::ROL_ADMINISTRADOR) {
             return $this->response->setJSON(['success' => false, 'message' => 'Los administradores no pueden realizar compras.']);
         }
         return null; // OK
@@ -112,7 +117,7 @@ class CarritoController extends Controller
         if ($error = $this->checkAuth()) return $error;
 
         $id_carrito = $this->request->getPost('id_carrito');
-        $accion = $this->request->getPost('accion'); // 'sumar' o 'restar'
+        $accion = $this->request->getPost('accion'); // 'sumar', 'restar' o 'fijar'
 
         $carritoModel = new CarritoComprasModel();
         $productoModel = new ProductoModel();
@@ -124,16 +129,16 @@ class CarritoController extends Controller
 
         $producto = $productoModel->find($item['id_producto']);
         
-        if ($accion === 'sumar') {
+        if ($accion === self::ACCION_SUMAR) {
             $nuevaCantidad = $item['cantidad'] + 1;
             if ($nuevaCantidad > $producto['stock']) {
                 return $this->response->setJSON(['success' => false, 'message' => 'Solo tenemos ' . $producto['stock'] . ' unidades disponibles de este producto.']);
             }
             $carritoModel->update($id_carrito, ['cantidad' => $nuevaCantidad]);
-        } else if ($accion === 'restar') {
+        } else if ($accion === self::ACCION_RESTAR) {
             $nuevaCantidad = $item['cantidad'] - 1;
             $this->guardarCantidad($carritoModel, $id_carrito, $nuevaCantidad);
-        } else if ($accion === 'fijar') {
+        } else if ($accion === self::ACCION_FIJAR) {
             $nuevaCantidad = (int)$this->request->getPost('cantidad');
             if ($nuevaCantidad > $producto['stock']) {
                 $nuevaCantidad = $producto['stock'];
