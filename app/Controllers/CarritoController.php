@@ -41,6 +41,14 @@ class CarritoController extends Controller
         $carritoModel->update($idCarrito, ['cantidad' => $nuevaCantidad]);
     }
 
+    /**
+     * Comprueba que el item existe y pertenece al usuario en sesión.
+     */
+    private function esItemDelUsuario($item)
+    {
+        return $item && $item['id_usuario'] == session()->get('id_usuario');
+    }
+
     public function obtener()
     {
         if ($error = $this->checkAuth()) return $error;
@@ -110,7 +118,7 @@ class CarritoController extends Controller
         $productoModel = new ProductoModel();
 
         $item = $carritoModel->find($id_carrito);
-        if (!$item || $item['id_usuario'] != session()->get('id_usuario')) {
+        if (!$this->esItemDelUsuario($item)) {
             return $this->response->setJSON(['success' => false, 'message' => 'Item no válido.']);
         }
 
@@ -145,7 +153,7 @@ class CarritoController extends Controller
         
         // Medida de seguridad
         $item = $carritoModel->find($id_carrito);
-        if ($item && $item['id_usuario'] == session()->get('id_usuario')) {
+        if ($this->esItemDelUsuario($item)) {
             $carritoModel->delete($id_carrito);
         }
 

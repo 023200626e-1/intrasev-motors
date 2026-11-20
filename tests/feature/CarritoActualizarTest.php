@@ -129,6 +129,37 @@ final class CarritoActualizarTest extends CIUnitTestCase
             ->where('id_carrito', $idCarrito)->countAllResults());
     }
 
+    public function testItemDeOtroUsuarioEsRechazado(): void
+    {
+        $contexto = $this->crearContexto(5);
+
+        $this->db->table('tUsuarios')->insert([
+            'id_usuario'         => 2,
+            'id_rol'             => 2,
+            'usuario'            => 'otro_cliente',
+            'nombre_completo'    => 'Otro cliente',
+            'correo_electronico' => 'otro_cliente@example.com',
+            'contrasena_hash'    => 'hash',
+            'fecha_creacion'     => date('Y-m-d H:i:s'),
+        ]);
+
+        $idCarrito = $this->insertarItem([
+            'id_usuario'  => 2,
+            'id_producto' => $contexto['id_producto'],
+        ], 1);
+
+        $response = $this->withSession($this->sesionCliente())
+            ->post('carrito/actualizar', [
+                'id_carrito' => $idCarrito,
+                'accion'     => 'sumar',
+            ]);
+        $json = json_decode($response->getJSON(), true);
+
+        $this->assertFalse($json['success']);
+        $this->assertSame('Item no válido.', $json['message']);
+        $this->assertSame(1, $this->cantidadDe($idCarrito));
+    }
+
     public function testAccionDesconocidaNoCambiaElItem(): void
     {
         $contexto  = $this->crearContexto(5);
