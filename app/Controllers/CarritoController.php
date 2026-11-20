@@ -170,11 +170,10 @@ class CarritoController extends Controller
             return redirect()->to('public/')->with('error', 'Tu carrito está vacío.');
         }
 
-        foreach ($items as $item) {
-            if ($item['cantidad'] > $item['stock']) {
-                // Flash message for user
-                return redirect()->to('public/')->with('error', 'El producto "' . $item['nombre'] . '" excedió el stock disponible. Ajusta la cantidad.');
-            }
+        $itemSinStock = $carritoService->primerItemSinStock($items);
+        if ($itemSinStock !== null) {
+            // Flash message for user
+            return redirect()->to('public/')->with('error', 'El producto "' . $itemSinStock['nombre'] . '" excedió el stock disponible. Ajusta la cantidad.');
         }
 
         $total = $carritoService->calcularTotal($items);
@@ -229,13 +228,12 @@ class CarritoController extends Controller
             return $this->response->setJSON(['success' => false, 'message' => 'Tu carrito está vacío.']);
         }
 
-        foreach ($items as $item) {
-            if ($item['cantidad'] > $item['stock']) {
-                return $this->response->setJSON([
-                    'success' => false, 
-                    'message' => 'El producto "' . $item['nombre'] . '" ya no tiene stock (' . $item['stock'] . ' disp).'
-                ]);
-            }
+        $itemSinStock = $carritoService->primerItemSinStock($items);
+        if ($itemSinStock !== null) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => 'El producto "' . $itemSinStock['nombre'] . '" ya no tiene stock (' . $itemSinStock['stock'] . ' disp).'
+            ]);
         }
 
         $total = $carritoService->calcularTotal($items);

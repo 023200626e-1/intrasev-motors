@@ -45,4 +45,20 @@ class CarritoService
 
         return $total;
     }
+
+    /**
+     * Devuelve el primer item cuya cantidad supera el stock, o null.
+     * El controlador conserva sus propios mensajes porque checkout y
+     * procesar_pago informan el problema de formas distintas.
+     */
+    public function primerItemSinStock($items)
+    {
+        foreach ($items as $item) {
+            if ($item['cantidad'] > $item['stock']) {
+                return $item;
+            }
+        }
+
+        return null;
+    }
 }
