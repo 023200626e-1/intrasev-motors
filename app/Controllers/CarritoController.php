@@ -165,16 +165,10 @@ class CarritoController extends Controller
     {
         if ($error = $this->checkAuth()) return redirect()->to('login');
 
-        $db = \Config\Database::connect();
         $id_usuario = session()->get('id_usuario');
+        $carritoService = new CarritoService();
 
-        $query = $db->table('tCarritoCompras')
-                    ->select('tCarritoCompras.cantidad, tProductos.id_producto, tProductos.precio, tProductos.stock, tProductos.nombre, tProductos.imagen')
-                    ->join('tProductos', 'tProductos.id_producto = tCarritoCompras.id_producto')
-                    ->where('tCarritoCompras.id_usuario', $id_usuario)
-                    ->get();
-
-        $items = $query->getResultArray();
+        $items = $carritoService->obtenerItems($id_usuario);
 
         if (empty($items)) {
             return redirect()->to('public/')->with('error', 'Tu carrito está vacío.');
