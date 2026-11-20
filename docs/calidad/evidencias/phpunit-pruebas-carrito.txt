@@ -1,0 +1,22 @@
+PHPUnit 11.5.56 by Sebastian Bergmann and contributors.
+
+Runtime:       PHP 8.2.12
+Configuration: C:\Users\vago\AppData\Local\Temp\opencode\intrasev-motors-git\phpunit.xml.dist
+
+......                                                              6 / 6 (100%)
+
+Time: 00:39.216, Memory: 16.00 MB
+
+OK, but there were issues!
+Tests: 6, Assertions: 20, PHPUnit Deprecations: 1.
+PHPUnit 11.5.56 by Sebastian Bergmann and contributors.
+
+Runtime:       PHP 8.2.12
+Configuration: C:\Users\vago\AppData\Local\Temp\opencode\intrasev-motors-git\phpunit.xml.dist
+
+............                                                      12 / 12 (100%)
+
+Time: 00:42.229, Memory: 16.00 MB
+
+OK, but there were issues!
+Tests: 12, Assertions: 26, PHPUnit Deprecations: 1.

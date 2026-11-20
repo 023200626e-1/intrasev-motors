@@ -39,7 +39,22 @@ Hallazgos verificados leyendo `app/Controllers/CarritoController.php` (375 líne
 
 ## F25. Matriz de comportamiento y regresión
 
-*(Completar por Persona 3 y Persona 5: Frank Puma Ucharo y Renato Aldair Mamani Apaza)*
+Seis escenarios escritos contra el comportamiento actual, antes de cualquier refactorización. Copia independiente en `docs/calidad/F25-matriz.md`. Salida real en `docs/calidad/evidencias/phpunit-pruebas-carrito.txt` (CarritoTest: 6 pruebas, 20 aserciones, 0 fallos; suite completa: 12 pruebas, 26 aserciones, 0 fallos).
+
+- Entorno de ejecución: PHP 8.2.12, PHPUnit 11.5.56, base MySQL aislada `ds_g1_testing` con prefijo `db_` configurada solo en `.env` local (nunca se usó `ds_g1`). Las migraciones corren con `DatabaseTestTrait` (`$migrate = true`, `$refresh = true`, `$namespace = 'App'`). CSRF está desactivado, así que no se envió token.
+- La migración original usa nombres de llaves foráneas que SQLite no acepta, por eso se siguió la alternativa de la guía: base MySQL de pruebas separada. No se cambió el esquema ni el código de producción.
+- Hay 1 deprecación de PHPUnit proveniente del trait `DatabaseTestTrait` (`resetMigrationSeedCount()` con metadata en doc-comment), no de las pruebas nuevas.
+
+| CP | Escenario | Método de prueba | Antes (código original) | Después |
+| :--- | :--- | :--- | :--- | :--- |
+| CP-01 | `GET carrito/obtener` sin sesión | `testObtenerSinSesionEsRechazado` | Verde: JSON con `success:false` y mensaje exacto "Debes iniciar sesión para comprar." | (lo mide Persona 5) |
+| CP-02 | `POST carrito/agregar` con `id_rol = 1` | `testAdministradorNoPuedeAgregar` | Verde: JSON con `success:false` y "Los administradores no pueden realizar compras."; carrito sin filas | (lo mide Persona 5) |
+| CP-03 | Cliente con producto de `stock = 0` en `POST carrito/agregar` | `testAgregarSinStockEsRechazado` | Verde: `success:false` y "Producto sin stock disponible."; no se crea fila en `tCarritoCompras` | (lo mide Persona 5) |
+| CP-04 | Cantidad mayor al stock en `POST carrito/procesar_pago` | `testProcesarPagoRechazaCantidadMayorAlStock` | Verde: `success:false`, mensaje contiene "Laptop Gamer" y "2 disp"; el stock sigue en 2 y no hay pedidos | (lo mide Persona 5) |
+| CP-05 | Cantidad igual al stock en `POST carrito/procesar_pago` | `testProcesarPagoConCantidadIgualAlStock` | Verde: `success:true` con `id_pedido`; stock queda en 0, carrito vacío y pedido en `Pagado` | (lo mide Persona 5) |
+| CP-06 | `POST carrito/actualizar` con `accion=restar` sobre cantidad 1 | `testActualizarRestarEliminaItem` | Verde: `success:true` y el ítem se elimina de `tCarritoCompras` | (lo mide Persona 5) |
+
+CP-04 y CP-05 protegen lo que toca R1 (stock, total, estado del pedido); CP-06 protege lo que toca R2. Las expectativas no se cambiarán al medir "Después".
 
 ---
 
@@ -50,7 +65,7 @@ Indicadores manuales repetibles, sin PHPStan ni PHPMD, por indicación del docen
 - Entorno declarado en F22: PHP 8.3.33, CodeIgniter 4.5.1, PHPUnit 11.5.56. Los conteos de código se ejecutaron sobre el mismo archivo (SHA-256 `1733064a99d1a416bc1f7ac6f91a7e25758b7050a013acaf2b3a242b812bfbb6`) en un puesto con PHP 8.2.12; las cifras son de lectura de código y no dependen de la versión. La Persona 5 debe repetir la medición final en el mismo entorno de la línea base y ajustar esta nota si es necesario.
 - Archivo medido: `app/Controllers/CarritoController.php` (375 líneas). Alcance final: el mismo archivo más `app/Services/CarritoService.php` para copias de consulta y bucles de total.
 - Ancla Git: commit base F22 `ac64f7d`; commit sobre el que se registró la línea base del turno 2: `75f596c` (HEAD de `refactor/carrito` al iniciar la medición).
-- Evidencia de pruebas: `docs/calidad/evidencias/phpunit-antes.txt` (el archivo de la Persona 1 se conserva sin modificar).
+- Evidencia de pruebas: `docs/calidad/evidencias/phpunit-antes.txt` (Persona 1, sin modificar) y `docs/calidad/evidencias/phpunit-pruebas-carrito.txt` (CarritoTest y suite completa, Persona 3).
 
 | Indicador (mismo alcance) | Inicial | Final | Interpretación |
 | :--- | :--- | :--- | :--- |
@@ -61,7 +76,7 @@ Indicadores manuales repetibles, sin PHPStan ni PHPMD, por indicación del docen
 | Bucles que suman el total | 4 (`$total +=`) | (lo mide Persona 5) | Confirma DT-02. Debe quedar en 1 dentro del servicio. |
 | Complejidad por conteo de `procesar_pago` | 8 | (lo mide Persona 5) | Confirma DT-03; se espera que baje al mover validación y cálculo. |
 | Complejidad por conteo de `actualizar` | 11 | (lo mide Persona 5) | Confirma DT-04; R2 debe bajarla al extraer la guardada de cantidad. |
-| Pruebas aprobadas y fallidas | OK: 6 pruebas, 6 aserciones, 0 fallos | (lo mide Persona 5) | Condición inicial registrada por Persona 1. Todavía no existe `CarritoTest.php`: Persona 3 debe agregarlo y actualizar esta fila antes del cierre. |
+| Pruebas aprobadas y fallidas | OK: 12 pruebas, 26 aserciones, 0 fallos (6 originales + 6 de `CarritoTest.php`) | (lo mide Persona 5) | Condición inicial ya con la red de seguridad en verde, medida sobre el código sin refactorizar. Persona 5 debe correr las mismas pruebas sin cambiar expectativas. |
 
 **Regla de conteo:** líneas de método desde la firma hasta la llave de cierre inclusive; complejidad = cantidad de `if` (incluido el de `else if`), `foreach`, `&&`, `||`, `?:` y `??` dentro del rango, más 1. Desglose: `procesar_pago` = 5 `if` + 2 `foreach` + 1 = 8; `actualizar` = 9 `if` + 1 `||` + 1 = 11.
 
@@ -73,6 +88,7 @@ Indicadores manuales repetibles, sin PHPStan ni PHPMD, por indicación del docen
 | :--- | :--- | :--- | :--- |
 | `0444810` | Persona 1 (Jean Pol Sullca Caballero) | `docs/calidad/evidencias/.gitkeep`, `docs/calidad/evidencias/phpunit-antes.txt`, `docs/calidad/Informe-Calidad.md` | Creación de línea base en rama `refactor/carrito`, estructura del informe, formato F22 y evidencia inicial de PHPUnit (6 tests, 6 assertions OK). |
 | `7143513` | Persona 2 (Jhon Richard Daniel Guillen Hurtado) | `docs/calidad/Informe-Calidad.md`, `F23-inventario.md`, `F26-medicion.md`, `evidencias/medicion-manual.md` | Completar F23, incidencias y columna "Inicial" de F26 sobre el commit `75f596c`; conteos manuales y evidencia de PHPUnit sin cambios de código. |
+| `(registrar con git log -1 --format=%h)` | Persona 3 (Frank Puma Ucharo) | `tests/feature/CarritoTest.php`, `docs/calidad/Informe-Calidad.md`, `F25-matriz.md`, `evidencias/phpunit-pruebas-carrito.txt` | Red de seguridad de 6 escenarios en verde sobre el código original; F25 columna "Antes" y actualización de la fila de pruebas de F26. |
 
 ---
 
