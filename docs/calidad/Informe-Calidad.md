@@ -33,7 +33,20 @@ Hallazgos verificados leyendo `app/Controllers/CarritoController.php` (375 líne
 
 ## F24. Plan de refactorización
 
-*(Completar por Personas 4 y 5: Richard Triveños Llacta y Renato Aldair Mamani Apaza)*
+Copia independiente de la columna R1 en `docs/calidad/F24-refactorizacion.md`.
+
+| Campo | R1 (Persona 4: Richard Triveños Llacta) | R2 (Persona 5: Renato Aldair Mamani Apaza) |
+| :--- | :--- | :--- |
+| Hallazgo que resuelve | DT-01 y DT-02 completos; DT-03 solo en su parte de acceso a datos y reglas de negocio. La apertura/cierre de transacciones y la escritura de pedidos siguen en el controlador, así que DT-03 queda **resuelto en parte** y `INC-01` sigue pendiente. | *(lo completa Persona 5)* |
+| Tipo de técnica | `Extract Class` | *(lo completa Persona 5)* |
+| Archivo y método antes | `CarritoController::obtener`, `checkout`, `procesar_pago`, `cancelar_pago` | *(lo completa Persona 5)* |
+| Estructura deseada | `app/Services/CarritoService.php` con `obtenerItems($idUsuario)`, `calcularTotal($items)` y `primerItemSinStock($items)`. El controlador solo orquesta la petición y la respuesta. | *(lo completa Persona 5)* |
+| Comportamiento que NO cambia | Respuestas JSON, mensajes, redirecciones, estado del pedido, stock descontado, las columnas del `select` de `obtener()`, el valor inicial `$total = 0` sin tipo `float` y el orden de validación (carrito vacío → stock). El controlador conserva sus mensajes propios en `checkout` y `procesar_pago`. | *(lo completa Persona 5)* |
+| Pruebas que lo protegen | CP-01 a CP-06 de `tests/feature/CarritoTest.php`: `testObtenerSinSesionEsRechazado`, `testAdministradorNoPuedeAgregar`, `testAgregarSinStockEsRechazado`, `testProcesarPagoRechazaCantidadMayorAlStock`, `testProcesarPagoConCantidadIgualAlStock`, `testActualizarRestarEliminaItem`. Adicionalmente, 5 pruebas unitarias / 7 aserciones en `tests/unit/CarritoServiceTest.php`, que no reemplazan a la regresión. | *(lo completa Persona 5)* |
+| Riesgo o efecto colateral | Cambio de tipo del total, columnas del `select` y orden de validaciones. Se mitigaron conservando la aritmética y el `0` entero original, la lista de columnas de `obtener()` y la precedencia de las validaciones. No se movió la transacción al servicio por ser el cambio más riesgoso. | *(lo completa Persona 5)* |
+| Commit asociado | `980534c`, `aff4f4b`, `46ea5e4`, `40b1768`, `bb3b777` (cinco pasos de R1) y `d270502` (pruebas unitarias y evidencia). | *(lo completa Persona 5)* |
+
+R1 terminó en verde: `CarritoTest` 6 pruebas / 20 aserciones, suite completa 17 pruebas / 33 aserciones, 0 fallos. La salida quedó en `docs/calidad/evidencias/phpunit-r1.txt` (junto a la suite completa). Después de R1, el controlador tiene 0 copias de `join('tProductos'`, 0 de `$total +=` y 0 comparaciones `['cantidad'] >`; esas tres responsabilidades viven ahora en `CarritoService`.
 
 ---
 
@@ -89,6 +102,13 @@ Indicadores manuales repetibles, sin PHPStan ni PHPMD, por indicación del docen
 | `0444810` | Persona 1 (Jean Pol Sullca Caballero) | `docs/calidad/evidencias/.gitkeep`, `docs/calidad/evidencias/phpunit-antes.txt`, `docs/calidad/Informe-Calidad.md` | Creación de línea base en rama `refactor/carrito`, estructura del informe, formato F22 y evidencia inicial de PHPUnit (6 tests, 6 assertions OK). |
 | `7143513` | Persona 2 (Jhon Richard Daniel Guillen Hurtado) | `docs/calidad/Informe-Calidad.md`, `F23-inventario.md`, `F26-medicion.md`, `evidencias/medicion-manual.md` | Completar F23, incidencias y columna "Inicial" de F26 sobre el commit `75f596c`; conteos manuales y evidencia de PHPUnit sin cambios de código. |
 | `b4f3d39` | Persona 3 (Frank Puma Ucharo) | `tests/feature/CarritoTest.php`, `docs/calidad/Informe-Calidad.md`, `F25-matriz.md`, `evidencias/phpunit-pruebas-carrito.txt` | Red de seguridad de 6 escenarios en verde sobre el código original; F25 columna "Antes" y actualización de la fila de pruebas de F26. |
+| `980534c` | Persona 4 (Richard Triveños Llacta) | `app/Services/CarritoService.php`, `app/Controllers/CarritoController.php` | Paso 1 de R1: crear `CarritoService::obtenerItems()` y reemplazar la consulta en `obtener()`; `php -l` y `CarritoTest` en verde. |
+| `aff4f4b` | Persona 4 (Richard Triveños Llacta) | `app/Controllers/CarritoController.php` | Paso 2 de R1: usar el servicio en `checkout()`; sin cambios en mensajes ni redirecciones. |
+| `46ea5e4` | Persona 4 (Richard Triveños Llacta) | `app/Controllers/CarritoController.php` | Paso 3 de R1: usar el servicio en `procesar_pago()` y `cancelar_pago()`; controlador sin `join('tProductos'`. |
+| `40b1768` | Persona 4 (Richard Triveños Llacta) | `app/Services/CarritoService.php`, `app/Controllers/CarritoController.php` | Paso 4 de R1: centralizar `calcularTotal()` conservando `$total = 0` entero; controlador sin `$total +=`. |
+| `bb3b777` | Persona 4 (Richard Triveños Llacta) | `app/Services/CarritoService.php`, `app/Controllers/CarritoController.php` | Paso 5 de R1: centralizar `primerItemSinStock()`; cada método conserva su mensaje y se mantiene el orden de validaciones. |
+| `d270502` | Persona 4 (Richard Triveños Llacta) | `tests/unit/CarritoServiceTest.php`, `docs/calidad/evidencias/phpunit-r1.txt` | 5 pruebas unitarias adicionales (7 aserciones) para total y validación de stock con arreglos; suite completa 17 pruebas / 33 aserciones / 0 fallos. |
+| `(registrar con git log -1 --format=%h)` | Persona 4 (Richard Triveños Llacta) | `docs/calidad/Informe-Calidad.md`, `F24-refactorizacion.md` | Completar F24 columna R1 (DT-01, DT-02 y DT-03 parcial) y F27 con los hashes de los cinco pasos y las pruebas unitarias. |
 
 ---
 
